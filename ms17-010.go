@@ -1,10 +1,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -19,14 +19,14 @@ var (
 
 func detectHost(ip string) {
 	// connecting to a host in LAN if reachable should be very quick
-	timeout := time.Second * 1
+	timeout := time.Second * 2
 	conn, err := net.DialTimeout("tcp", ip+":445", timeout)
 	if err != nil {
-		log.Printf("failed to connect")
+		fmt.Printf("failed to connect to %s\n", ip)
 		return
 	}
 
-	conn.SetDeadline(time.Now().Add(time.Second * 2))
+	conn.SetDeadline(time.Now().Add(time.Second * 5))
 	conn.Write(negotiateProtocolRequest)
 	reply := make([]byte, 1024)
 	// let alone half packet
@@ -35,14 +35,35 @@ func detectHost(ip string) {
 	}
 
 	conn.Write(sessionSetupRequest)
-	if n, err := conn.Read(reply); err != nil || n < 36 {
+
+	n, err := conn.Read(reply)
+	if err != nil || n < 36 {
 		return
 	}
 
+	// extract OS info
+	var os string
+	sessionSetupResponse := reply[36:n]
+	if wordCount := sessionSetupResponse[0]; wordCount != 0 {
+		// find byte count
+		byteCount := binary.LittleEndian.Uint16(sessionSetupResponse[7:9])
+		if n != int(byteCount)+45 {
+			fmt.Println("invalid session setup AndX response")
+		} else {
+			// two continous null byte as end of a unicode string
+			for i := 10; i < len(sessionSetupResponse)-1; i++ {
+				if sessionSetupResponse[i] == 0 && sessionSetupResponse[i+1] == 0 {
+					os = string(sessionSetupResponse[10:i])
+					break
+				}
+			}
+		}
+
+	}
 	userID := reply[32:34]
 	treeConnectRequest[32] = userID[0]
 	treeConnectRequest[33] = userID[1]
-	// TODO change the ip in tree path
+	// TODO change the ip in tree path though it doesn't matter
 	conn.Write(treeConnectRequest)
 
 	if n, err := conn.Read(reply); err != nil || n < 36 {
@@ -61,8 +82,11 @@ func detectHost(ip string) {
 	}
 
 	if reply[9] == 0x05 && reply[10] == 0x02 && reply[11] == 0x00 && reply[12] == 0xc0 {
-		fmt.Printf("%s is likely VULNERABLE to MS17-010!", ip)
+		fmt.Printf("%s(%s) is likely VULNERABLE to MS17-010!\n", ip, os)
+	} else {
+		fmt.Printf("%s(%s) stays in safety\n", ip, os)
 	}
+
 }
 
 func incIP(ip net.IP) {
@@ -86,7 +110,7 @@ func main() {
 	if *netCIDR != "" && *host == "" {
 		ip, ipNet, err := net.ParseCIDR(*netCIDR)
 		if err != nil {
-			fmt.Printf("invalid value for -n option")
+			fmt.Println("invalid value for -n option")
 			return
 		}
 		var wg sync.WaitGroup
