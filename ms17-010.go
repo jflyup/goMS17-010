@@ -18,16 +18,15 @@ var (
 	trans2SessionSetupRequest, _ = hex.DecodeString("0000004eff534d4232000000001807c00000000000000000000000000008fffe000841000f0c0000000100000000000000a6d9a40000000c00420000004e0001000e000d0000000000000000000000000000")
 )
 
-func detectHost(ip string) {
+func checkHost(ip string, timeout time.Duration) {
 	// connecting to a host in LAN if reachable should be very quick
-	timeout := time.Second * 2
-	conn, err := net.DialTimeout("tcp", ip+":445", timeout)
+	conn, err := net.DialTimeout("tcp", ip+":445", time.Second*timeout)
 	if err != nil {
 		fmt.Printf("failed to connect to %s\n", ip)
 		return
 	}
 
-	conn.SetDeadline(time.Now().Add(time.Second * 5))
+	conn.SetDeadline(time.Now().Add(time.Second * timeout))
 	conn.Write(negotiateProtocolRequest)
 	reply := make([]byte, 1024)
 	// let alone half packet
@@ -128,18 +127,20 @@ func incIP(ip net.IP) {
 }
 
 func main() {
-	host := flag.String("h", "", "host")
-	netCIDR := flag.String("n", "", "CIDR Notation of a network")
+	host := flag.String("i", "", "single ip address")
+	timeout := flag.Duration("t", 1, "timeout on connection, in seconds")
+	netCIDR := flag.String("n", "", "CIDR notation of a network")
 	flag.Parse()
 
 	if *host != "" {
-		detectHost(*host)
+		checkHost(*host, *timeout)
+		return
 	}
 
 	if *netCIDR != "" && *host == "" {
 		ip, ipNet, err := net.ParseCIDR(*netCIDR)
 		if err != nil {
-			fmt.Println("invalid value for -n option")
+			fmt.Println("invalid CIDR")
 			return
 		}
 		var wg sync.WaitGroup
@@ -148,7 +149,7 @@ func main() {
 			wg.Add(1)
 			go func(ip string) {
 				defer wg.Done()
-				detectHost(ip)
+				checkHost(ip, *timeout)
 			}(ip.String())
 		}
 

@@ -16,11 +16,13 @@ NAMED_PIPE_TRANS_REQUEST = binascii.unhexlify("0000004aff534d4225000000001801280
 parser = argparse.ArgumentParser(description="Detect if MS17-010 has been patched or not", formatter_class=argparse.RawTextHelpFormatter)
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('-i', '--ip', help='Single IP address to check')
-parser.add_argument('-t', '--timeout', help="Timeout on connection for socket in seconds", default=1)
-parser.add_argument('-v', '--verbose', help="Verbose output for checking of commands", action='store_true')
+group.add_argument('-n', '--network', help="CIDR notation of a network")
+parser.add_argument('-t', '--timeout', help="Timeout on connection, in seconds", default=1)
+parser.add_argument('-v', '--verbose', help="Verbose output", action='store_true')
 
 args = parser.parse_args()
 ip = args.ip
+network = args.network
 timeout = args.timeout
 verbose = args.verbose
 
@@ -91,3 +93,5 @@ def check_ip(ip):
 
 if ip:
     check_ip(ip)
+if network:
+    print 'not implement yet'
