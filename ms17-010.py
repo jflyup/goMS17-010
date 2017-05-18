@@ -3,7 +3,8 @@
 import binascii
 import socket
 import argparse
-import struct
+import struct 
+import threading
 
 # more detail: https://technet.microsoft.com/en-us/library/security/ms17-010.aspx
 # Packets
@@ -17,7 +18,8 @@ parser = argparse.ArgumentParser(description="Detect if MS17-010 has been patche
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('-i', '--ip', help='Single IP address to check')
 group.add_argument('-n', '--network', help="CIDR notation of a network")
-parser.add_argument('-t', '--timeout', help="Timeout on connection, in seconds", default=1)
+parser.add_argument('-t', '--timeout', help="Timeout on connection, in seconds", default=1) 
+parser.add_argument('-T', '--threads', help="Number of threads when checking a network(default 10)", default="10")
 parser.add_argument('-v', '--verbose', help="Verbose output", action='store_true')
 
 args = parser.parse_args()
@@ -25,6 +27,15 @@ ip = args.ip
 network = args.network
 timeout = args.timeout
 verbose = args.verbose
+threads_num = int(args.threads)
+semaphore = threading.BoundedSemaphore(value=threads_num)
+print_lock = threading.Lock()
+
+def print_status(ip, message):
+    global print_lock
+
+    with print_lock:
+        print "[*] [%s] %s" % (ip, message)
 
 def check_ip(ip):
     global negotiate_protocol_request, session_setup_request, tree_connect_request, trans2_session_setup, timeout, verbose
@@ -38,20 +49,20 @@ def check_ip(ip):
 
     # Send/receive negotiate protocol request
     if verbose:
-        print(ip, "Sending negotiation protocol request")
+        print_sta(ip, "Sending negotiation protocol request")
     s.send(NEGOTIATE_PROTOCOL_REQUEST)
     s.recv(1024)
 
     # Send/receive session setup request
     if verbose:
-        print(ip, "Sending session setup request")
+        print_sta(ip, "Sending session setup request")
     s.send(SESSION_SETUP_REQUEST)
     session_setup_response = s.recv(1024)
 
     # Extract user ID from session setup response
     user_id = session_setup_response[32:34]
     if verbose:
-        print(ip, "User ID = %s" % struct.unpack("<H", user_id)[0])
+        print_st(ip, "User ID = %s" % struct.unpack("<H", user_id)[0])
 
     # Replace user ID in tree connect request packet
     modified_tree_connect_request = list(TREE_CONNECT_REQUEST)
@@ -84,14 +95,35 @@ def check_ip(ip):
     s.send(modified_trans2_session_setup)
     final_response = s.recv(1024)
 
-    if final_response[9] == "\x05" and final_response[10] == "\x02" and final_response[11] == "\x00" and final_response[12] == "\xc0":      
-        print "[+] [%s] is likely VULNERABLE to MS17-010" % (ip)
-    else:
-        print "[-] [%s] stays in safety" % ip
+    with print_lock:
+	if final_response[9] == "\x05" and final_response[10] == "\x02" and final_response[11] == "\x00" and final_response[12] == "\xc0":      
+	    print "[+] [%s] is likely VULNERABLE to MS17-010" % (ip)
+	else:
+	    print "[-] [%s] stays in safety" % ip
 
     s.close()
+def check_thread(ip_address):
+    global semaphore
+
+    try:
+        check_ip(ip_address)
+    except Exception as e:
+        with print_lock:
+            print "[ERROR] [%s] - %s" % (ip_address, e)
+    finally:
+        semaphore.release()
 
 if ip:
     check_ip(ip)
 if network:
-    print 'not implement yet'
+    (ip, cidr) = network.split('/')
+    cidr = int(cidr) 
+    host_bits = 32 - cidr
+    i = struct.unpack('>I', socket.inet_aton(ip))[0] # note the endianness
+    start = (i >> host_bits) << host_bits # clear the host bits
+    end = i | ((1 << host_bits) - 1)  
+
+    for i in range(start+1, end):
+	semaphore.acquire()
+	t = threading.Thread(target=check_thread, args=(socket.inet_ntoa(struct.pack('>I',i)),))
+	t.start()
