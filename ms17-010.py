@@ -49,13 +49,17 @@ def check_ip(ip):
 
     # Send/receive negotiate protocol request
     if verbose:
-        print_sta(ip, "Sending negotiation protocol request")
+        print_status(ip, "Sending negotiation protocol request")
     s.send(NEGOTIATE_PROTOCOL_REQUEST)
-    s.recv(1024)
+    negotiate_reply = s.recv(1024)
+    if len(negotiate_reply) < 36 or struct.unpack("<I", negotiate_reply[9:13])[0] != 0 :
+        with print_lock:
+            print "[-] can't determine whether [%s] is valunerable" % ip
+            return
 
     # Send/receive session setup request
     if verbose:
-        print_sta(ip, "Sending session setup request")
+        print_status(ip, "Sending session setup request")
     s.send(SESSION_SETUP_REQUEST)
     session_setup_response = s.recv(1024)
 
@@ -63,6 +67,21 @@ def check_ip(ip):
     user_id = session_setup_response[32:34]
     if verbose:
         print_st(ip, "User ID = %s" % struct.unpack("<H", user_id)[0])
+
+    os = ''
+    word_count = ord(session_setup_response[36])
+    if  word_count != 0: 
+        # find byte count
+        byte_count = struct.unpack("<H", session_setup_response[43:45])[0]
+        if len(session_setup_response) != byte_count+45:
+            print_status("invalid session setup AndX response")
+        else:
+            # two continous null bytes indicate end of a unicode string
+            for i in range(46, len(session_setup_response)-1):
+                if ord(session_setup_response[i]) == 0 and ord(session_setup_response[i+1]) == 0: 
+                    # not necessary to support unicode
+                    os = session_setup_response[46:i].decode("utf-8")
+                    break
 
     # Replace user ID in tree connect request packet
     modified_tree_connect_request = list(TREE_CONNECT_REQUEST)
@@ -97,9 +116,9 @@ def check_ip(ip):
 
     with print_lock:
 	if final_response[9] == "\x05" and final_response[10] == "\x02" and final_response[11] == "\x00" and final_response[12] == "\xc0":      
-	    print "[+] [%s] is likely VULNERABLE to MS17-010" % (ip)
+	    print "[+] [%s](%s) is likely VULNERABLE to MS17-010" % (ip, os)
 	else:
-	    print "[-] [%s] stays in safety" % ip
+	    print "[-] [%s](%s) stays in safety" % (ip, os)
 
     s.close()
 def check_thread(ip_address):

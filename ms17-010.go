@@ -36,7 +36,7 @@ func checkHost(ip string, timeout time.Duration) {
 	}
 
 	if binary.LittleEndian.Uint32(reply[9:13]) != 0 {
-		// recv error
+		// status != 0
 		return
 	}
 
@@ -48,7 +48,7 @@ func checkHost(ip string, timeout time.Duration) {
 	}
 
 	if binary.LittleEndian.Uint32(reply[9:13]) != 0 {
-		// recv error
+		// status != 0
 		fmt.Printf("can't determine whether %s is vulnerable or not\n", ip)
 		return
 	}
@@ -62,7 +62,7 @@ func checkHost(ip string, timeout time.Duration) {
 		if n != int(byteCount)+45 {
 			fmt.Println("invalid session setup AndX response")
 		} else {
-			// two continous null byte as end of a unicode string
+			// two continous null bytes indicates end of a unicode string
 			for i := 10; i < len(sessionSetupResponse)-1; i++ {
 				if sessionSetupResponse[i] == 0 && sessionSetupResponse[i+1] == 0 {
 					os = string(sessionSetupResponse[10:i])
