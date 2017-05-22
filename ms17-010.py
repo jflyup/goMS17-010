@@ -54,7 +54,7 @@ def check_ip(ip):
     negotiate_reply = s.recv(1024)
     if len(negotiate_reply) < 36 or struct.unpack("<I", negotiate_reply[9:13])[0] != 0 :
         with print_lock:
-            print "[-] can't determine whether [%s] is valunerable" % ip
+            print "[-] [%s] can't determine whether it's vulunerable" % ip
             return
 
     # Send/receive session setup request
@@ -91,14 +91,14 @@ def check_ip(ip):
 
     # Send tree connect request
     if verbose:
-        print(ip, "Sending tree connect")
+        print_status(ip, "Sending tree connect")
     s.send(modified_tree_connect_request)
     tree_connect_response = s.recv(1024)
 
     # Extract tree ID from response
     tree_id = tree_connect_response[28:30]
     if verbose:
-        print(ip, "Tree ID = %s" % struct.unpack("<H", tree_id)[0])
+        print_status(ip, "Tree ID = %s" % struct.unpack("<H", tree_id)[0])
 
     # Replace tree ID and user ID in named pipe trans packet
     modified_trans2_session_setup = list(NAMED_PIPE_TRANS_REQUEST)
@@ -110,7 +110,7 @@ def check_ip(ip):
 
     # Send trans2 sessions setup request
     if verbose:
-        print(ip, "Sending named pipe")
+        print_status(ip, "Sending named pipe")
     s.send(modified_trans2_session_setup)
     final_response = s.recv(1024)
 
