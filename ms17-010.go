@@ -25,6 +25,7 @@ func checkHost(ip string, timeout time.Duration) {
 		fmt.Printf("failed to connect to %s\n", ip)
 		return
 	}
+	defer conn.Close()
 
 	conn.SetDeadline(time.Now().Add(time.Second * timeout))
 	conn.Write(negotiateProtocolRequest)
