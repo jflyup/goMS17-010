@@ -1,5 +1,7 @@
 # goMS17-010
-`goMS17-010` detects if host(s) is vulnerable to SMB exploit([MS17-010](https://technet.microsoft.com/en-us/library/security/ms17-010.aspx)), which is used by NSA hacking tools leaked by Shadow Brokers. If it's vulnerable, then checks if the target machine is running the Double Pulsar SMB backdoor. Inspired by [this Metasploit module](https://www.rapid7.com/db/modules/auxiliary/scanner/smb/smb_ms17_010), but doen't depend on MSF or any framework, just run `ms17-010.go` or `ms17-010.py` with option(s). Go version is preferred as it's very fast(credit goroutine for that! ) when scanning a network. The release is built from go code.    
+`goMS17-010` detects if host(s) is vulnerable to SMB exploit([MS17-010](https://technet.microsoft.com/en-us/library/security/ms17-010.aspx)), which is used by NSA hacking tools leaked by Shadow Brokers. If it's vulnerable, then checks if the target machine is running the Double Pulsar SMB backdoor. Inspired by [this Metasploit module](https://www.rapid7.com/db/modules/auxiliary/scanner/smb/smb_ms17_010), but doesn't depend on MSF or any framework, just run `ms17-010.go` or `ms17-010.py` with option(s). Go version is preferred as it's very fast (credit goroutine for that! ) when scanning a network. The release is built from go code.    
 `-i`, detect single host  
 `-n`, scan a whole network in CIDR Notation, for example, `192.168.1.1/24`  
 `-h`, show help
+
+[Here](https://play.google.com/store/apps/details?id=house.connect.wifi) is an Android app to check this too. Enable `WannaCry Scan` toggle in the `Settings`, the app would scan your network, if any machine is vulnerable, a red warning icon will show.
